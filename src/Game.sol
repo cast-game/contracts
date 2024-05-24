@@ -3,6 +3,7 @@ pragma solidity ^0.8.25;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./Tickets.sol";
 
@@ -12,20 +13,20 @@ contract Game is Ownable {
     Tickets public tickets;
     IERC20 public token;
 
-    address public protocolTreasury = 0x0;
+    address public protocolTreasury = address(0);
     address public channelHost;
 
     // 5% protocol fee
-    address public protocolFeePercent = 0.05 ether;
+    uint256 public protocolFeePercent = 0.05 ether;
     // 5% creator fee (of transaction)
-    address public creatorFeePercent = 0.05 ether;
+    uint256 public creatorFeePercent = 0.05 ether;
     // 5% channel host fee (of final prize pool)
-    address public hostFeePercent = 0.05 ether;
+    uint256 public hostFeePercent = 0.05 ether;
     // 15% winning cast creator fee (of final prize pool)
-    address public winnningCreatorFeePercent = 0.15 ether;
+    uint256 public winnningCreatorFeePercent = 0.15 ether;
 
     bool public isActive = false;
-    bool public endBlock;
+    uint256 public endBlock;
 
     // Nonce to ensure hashes are unique per transaction
     mapping(string => uint256) public nonce;
@@ -48,6 +49,8 @@ contract Game is Ownable {
     error InsufficientPayment();
     error TransferFailed();
     error GameNotActive();
+    error GameStillActive();
+    error InvalidSignature();
 
     constructor(
         address _channelHost,
@@ -105,7 +108,7 @@ contract Game is Ownable {
         uint256 protocolFee = (price * protocolFeePercent) / 1 ether;
         uint256 creatorFee = (price * creatorFeePercent) / 1 ether;
 
-        if (msg.value < price + protocolFee + creatorFee)
+        if (token.balanceOf(msg.sender) < price + protocolFee + creatorFee)
             revert InsufficientPayment();
 
         // Transfer fees
@@ -128,19 +131,24 @@ contract Game is Ownable {
     function endGame(
         string memory castHash,
         address winningCreator,
-        address[] ticketHolders
+        address[] calldata ticketHolders
     ) external onlyOwner {
+        if (block.number < endBlock) revert GameStillActive();
+
+        uint256 prizePool = token.balanceOf(address(this));
+
         // Calculate fees
-        uint256 hostFee = (price * hostFeePercent) / 1 ether;
-        uint256 winningCreatorFee = (price * winnningCreatorFeePercent) /
+        uint256 hostFee = (prizePool * hostFeePercent) / 1 ether;
+        uint256 winningCreatorFee = (prizePool * winnningCreatorFeePercent) /
             1 ether;
 
         // Transfer fees
         token.transferFrom(address(this), channelHost, hostFee);
         token.transferFrom(address(this), winningCreator, winningCreatorFee);
 
-        uint256 remainingPool = token.balanceOf(address(this));
         // Distribute the rest of the prize pool to ticket holders
+        uint256 remainingPool = token.balanceOf(address(this));
+        
         for (uint256 i = 0; i < ticketHolders.length; i++) {
             token.transferFrom(
                 address(this),
