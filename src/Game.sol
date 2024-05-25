@@ -62,15 +62,6 @@ contract Game is Ownable {
         channelHost = _channelHost;
     }
 
-    function startGame(uint256 duration) external onlyOwner {
-        isActive = true;
-        endBlock = block.number + duration;
-    }
-
-    function updateGameStatus(bool _isActive) external onlyOwner {
-        isActive = _isActive;
-    }
-
     /// @notice recover the signer from the hash and signature
     function verifySignature(
         bytes memory signature,
@@ -126,6 +117,16 @@ contract Game is Ownable {
             protocolFee,
             creatorFee
         );
+    }
+
+    // Admin functions
+    function startGame(uint256 duration) external onlyOwner {
+        isActive = true;
+        endBlock = block.number + duration;
+    }
+
+    function updateGameStatus(bool _isActive) external onlyOwner {
+        isActive = _isActive;
     }
 
     function endGame(
