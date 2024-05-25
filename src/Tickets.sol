@@ -12,13 +12,9 @@ contract Tickets is ERC1155, Ownable {
     // token id -> uri
     mapping(uint256 => string) public uris;
 
-    error NotOwner();
+    error NotContract();
 
     constructor() ERC1155("") Ownable(msg.sender) {}
-
-    function getTokenId() external returns (uint256) {
-        return ++latestTokenId;
-    }
 
     function setGameContract(address _gameContract) external onlyOwner {
         gameContract = _gameContract;
@@ -40,9 +36,9 @@ contract Tickets is ERC1155, Ownable {
         string memory castHash,
         uint256 amount
     ) external {
-        if (msg.sender != gameContract) revert NotOwner();
+        if (msg.sender != gameContract) revert NotContract();
         uint256 tokenId = castTokenId[castHash];
-        if (tokenId == 0) tokenId = ++latestTokenId;
+        if (tokenId == 0) tokenId = latestTokenId++;
 
         castTokenId[castHash] = tokenId;
 
