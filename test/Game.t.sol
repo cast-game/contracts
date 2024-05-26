@@ -62,7 +62,6 @@ contract GameTest is Test {
         assertEq(game.isActive(), true);
     }
 
-    // TODO: verify signature
     function test_VerifySignature() public {
         vm.startPrank(owner);
         bytes32 hash = keccak256(
@@ -81,10 +80,11 @@ contract GameTest is Test {
         assertEq(signer, owner);
     }
 
-    function test_Buy() public {
-        token.approve(address(game), 1000);
-        // game.buy("0x1", 1000, "0x1", "0x1", "0x1");
-        // assertEq(token.balanceOf(address(game)), 1000);
+    function test_BuyTicket() public {
+        // TODO: determine price
+        uint256 price = 1 ether;
+
+        
     }
 
     // TODO: test bonding curve
