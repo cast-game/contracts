@@ -29,6 +29,7 @@ contract Game is Ownable {
     uint256 public winnningCreatorFeePercent = 0.15 ether;
 
     bool public isActive = false;
+    uint256 public tradingEndBlock;
     uint256 public endBlock;
 
     // Nonce to ensure hashes are unique per transaction
@@ -59,7 +60,7 @@ contract Game is Ownable {
     error InsufficientPayment();
     error TransferFailed();
     error GameNotActive();
-    error GameStillActive();
+    error GameNotOver();
     error InvalidSignature();
 
     constructor(
@@ -72,6 +73,31 @@ contract Game is Ownable {
         token = IERC20(_token);
         channelHost = _channelHost;
         protocolTreasury = _treasury;
+    }
+
+    // Admin functions
+    function startGame(
+        uint256 _tradingEndBlock,
+        uint256 _endBlock
+    ) external onlyOwner {
+        isActive = true;
+        tradingEndBlock = _tradingEndBlock;
+        endBlock = _endBlock;
+    }
+
+    function updateGameStatus(bool _isActive) external onlyOwner {
+        isActive = _isActive;
+    }
+
+    function payout(
+        address[] calldata winners,
+        uint256[] calldata amounts
+    ) external onlyOwner {
+        if (block.number < endBlock) revert GameNotOver();
+
+        for (uint256 i = 0; i < winners.length; i++) {
+            token.transfer(winners[i], amounts[i]);
+        }
     }
 
     /// @notice recover the signer from the hash and signature
@@ -92,7 +118,7 @@ contract Game is Ownable {
         address referrer,
         bytes memory signature
     ) external {
-        if (!isActive || block.number > endBlock) revert GameNotActive();
+        if (!isActive || block.number > tradingEndBlock) revert GameNotActive();
 
         bytes32 hash = keccak256(
             abi.encodePacked(
@@ -142,7 +168,7 @@ contract Game is Ownable {
         address referrer,
         bytes memory signature
     ) external {
-        if (!isActive || block.number > endBlock) revert GameNotActive();
+        if (!isActive || block.number > tradingEndBlock) revert GameNotActive();
 
         bytes32 hash = keccak256(
             abi.encodePacked(
@@ -180,47 +206,5 @@ contract Game is Ownable {
         tickets.burn(msg.sender, castHash, 1);
 
         emit Sold(msg.sender, castHash, price, protocolFee, creatorFee);
-    }
-
-    // Admin functions
-    function startGame(uint256 duration) external onlyOwner {
-        isActive = true;
-        endBlock = block.number + duration;
-    }
-
-    function updateGameStatus(bool _isActive) external onlyOwner {
-        isActive = _isActive;
-    }
-
-    function endGame(
-        string memory castHash,
-        address winningCreator,
-        address[] calldata ticketHolders
-    ) external onlyOwner {
-        if (block.number < endBlock) revert GameStillActive();
-
-        uint256 prizePool = token.balanceOf(address(this));
-
-        // Calculate fees
-        uint256 hostFee = (prizePool * hostFeePercent) / 1 ether;
-        uint256 winningCreatorFee = (prizePool * winnningCreatorFeePercent) /
-            1 ether;
-
-        // Transfer fees
-        token.transferFrom(address(this), channelHost, hostFee);
-        token.transferFrom(address(this), winningCreator, winningCreatorFee);
-
-        // Distribute the rest of the prize pool to ticket holders
-        uint256 remainingPool = token.balanceOf(address(this));
-
-        for (uint256 i = 0; i < ticketHolders.length; i++) {
-            token.transferFrom(
-                address(this),
-                ticketHolders[i],
-                remainingPool / ticketHolders.length
-            );
-        }
-
-        emit GameEnded(castHash, winningCreator, ticketHolders);
     }
 }
