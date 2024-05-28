@@ -20,6 +20,9 @@ contract Game is Ownable {
     uint256 public protocolFeePercent = 0.05 ether;
     // 5% creator fee (of transaction)
     uint256 public creatorFeePercent = 0.05 ether;
+    // 5% referral fee
+    uint256 public referralFeePercent = 0.05 ether;
+
     // 5% channel host fee (of final prize pool)
     uint256 public hostFeePercent = 0.05 ether;
     // 15% winning cast creator fee (of final prize pool)
@@ -86,12 +89,19 @@ contract Game is Ownable {
         string memory castHash,
         address castCreator,
         uint256 price,
+        address referrer,
         bytes memory signature
     ) external {
         if (!isActive || block.number > endBlock) revert GameNotActive();
 
         bytes32 hash = keccak256(
-            abi.encodePacked(castHash, castCreator, price, nonce[castHash])
+            abi.encodePacked(
+                castHash,
+                castCreator,
+                price,
+                referrer,
+                nonce[castHash]
+            )
         );
 
         verifySignature(signature, hash);
@@ -108,12 +118,16 @@ contract Game is Ownable {
         token.transferFrom(msg.sender, protocolTreasury, protocolFee);
         token.transferFrom(msg.sender, castCreator, creatorFee);
 
+        // Optionally transfer referral fee
+        uint256 amountAfterFees = price - protocolFee - creatorFee;
+        if (referrer != address(0)) {
+            uint256 referralFee = (price * referralFeePercent) / 1 ether;
+            token.transferFrom(msg.sender, referrer, referralFee);
+            amountAfterFees -= referralFee;
+        }
+
         // Transfer payment
-        token.transferFrom(
-            msg.sender,
-            address(this),
-            price - protocolFee - creatorFee
-        );
+        token.transferFrom(msg.sender, address(this), amountAfterFees);
 
         // Mint ERC1155
         tickets.mint(msg.sender, castHash, 1);
@@ -125,12 +139,19 @@ contract Game is Ownable {
         string memory castHash,
         address castCreator,
         uint256 price,
+        address referrer,
         bytes memory signature
     ) external {
         if (!isActive || block.number > endBlock) revert GameNotActive();
 
         bytes32 hash = keccak256(
-            abi.encodePacked(castHash, castCreator, price, nonce[castHash])
+            abi.encodePacked(
+                castHash,
+                castCreator,
+                price,
+                referrer,
+                nonce[castHash]
+            )
         );
 
         verifySignature(signature, hash);
@@ -144,9 +165,15 @@ contract Game is Ownable {
         token.transfer(protocolTreasury, protocolFee);
         token.transfer(castCreator, creatorFee);
 
-        // Transfer payment
+        // Optionally transfer referral fee
         uint256 finalSellAmount = price - protocolFee - creatorFee;
+        if (referrer != address(0)) {
+            uint256 referralFee = (price * referralFeePercent) / 1 ether;
+            token.transfer(referrer, referralFee);
+            finalSellAmount -= referralFee;
+        }
 
+        // Transfer payment
         token.transfer(msg.sender, finalSellAmount);
 
         // Burn ERC1155
