@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC1155/ERC1155.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Tickets is ERC1155, Ownable {
-    address public gameContract;
+    address public minter;
     uint256 public latestTokenId;
 
     // cast hash -> token id
@@ -15,12 +15,12 @@ contract Tickets is ERC1155, Ownable {
     // token id -> uri
     mapping(uint256 => string) public uris;
 
-    error NotContract();
+    error NotAuthorized();
 
     constructor() ERC1155("") Ownable(msg.sender) {}
 
-    function setGameContract(address _gameContract) external onlyOwner {
-        gameContract = _gameContract;
+    function setMinter(address newMinter) external onlyOwner {
+        minter = newMinter;
     }
 
     function uri(uint256 tokenId) public view override returns (string memory) {
@@ -39,7 +39,7 @@ contract Tickets is ERC1155, Ownable {
         string memory castHash,
         uint256 amount
     ) external {
-        if (msg.sender != gameContract) revert NotContract();
+        if (msg.sender != minter) revert NotAuthorized();
         uint256 tokenId = castTokenId[castHash];
         if (tokenId == 0) tokenId = latestTokenId++;
 
@@ -54,7 +54,7 @@ contract Tickets is ERC1155, Ownable {
         string memory castHash,
         uint256 amount
     ) external {
-        if (msg.sender != gameContract) revert NotContract();
+        if (msg.sender != minter) revert NotAuthorized();
         uint256 tokenId = castTokenId[castHash];
         supply[tokenId] -= amount;
 

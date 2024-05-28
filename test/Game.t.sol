@@ -39,17 +39,18 @@ contract GameTest is Test {
         );
         game.startGame(1000);
 
-        tickets.setGameContract(address(game));
+        tickets.setMinter(address(game));
     }
 
     function generateSignature(
         string memory castHash,
         address castCreator,
         uint256 price,
+        address referrer,
         uint256 nonce
     ) internal view returns (bytes memory) {
         bytes32 hash = keccak256(
-            abi.encodePacked(castHash, castCreator, price, nonce)
+            abi.encodePacked(castHash, castCreator, price, referrer, nonce)
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(
             ownerPk,
@@ -97,8 +98,14 @@ contract GameTest is Test {
         uint256 price = 1 ether;
         token.approve(address(game), price);
 
-        bytes memory signature = generateSignature("0x1", bob, price, 0);
-        game.buy("0x1", bob, price, signature);
+        bytes memory signature = generateSignature(
+            "0x1",
+            bob,
+            price,
+            address(0),
+            0
+        );
+        game.buy("0x1", bob, price, address(0), signature);
 
         assertEq(tickets.balanceOf(alice, 0), 1);
         assertEq(tickets.supply(0), 1);
@@ -112,13 +119,19 @@ contract GameTest is Test {
         uint256 price = 2 ether;
         token.approve(address(game), price);
 
-        bytes memory signature = generateSignature("0x1", bob, price, 0);
-        game.buy("0x1", bob, price, signature);
+        bytes memory signature = generateSignature(
+            "0x1",
+            bob,
+            price,
+            address(0),
+            0
+        );
+        game.buy("0x1", bob, price, address(0), signature);
 
         // Selling a ticket
         uint256 sellPrice = 1 ether;
-        signature = generateSignature("0x1", bob, sellPrice, 1);
-        game.sell("0x1", bob, sellPrice, signature);
+        signature = generateSignature("0x1", bob, sellPrice, address(0), 1);
+        game.sell("0x1", bob, sellPrice, address(0), signature);
 
         assertEq(tickets.balanceOf(alice, 0), 0);
         assertEq(tickets.supply(0), 0);
