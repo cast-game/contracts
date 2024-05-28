@@ -13,7 +13,7 @@ contract Game is Ownable {
     Tickets public tickets;
     IERC20 public token;
 
-    address public protocolTreasury = address(0);
+    address public protocolTreasury;
     address public channelHost;
 
     // 5% protocol fee
@@ -31,10 +31,17 @@ contract Game is Ownable {
     // Nonce to ensure hashes are unique per transaction
     mapping(string => uint256) public nonce;
 
-    event Purchase(
+    event Purchased(
         address indexed buyer,
         string indexed castHash,
-        uint256 amount,
+        uint256 price,
+        uint256 protocolFee,
+        uint256 creatorFee
+    );
+
+    event Sold(
+        address indexed seller,
+        string indexed castHash,
         uint256 price,
         uint256 protocolFee,
         uint256 creatorFee
@@ -54,12 +61,14 @@ contract Game is Ownable {
 
     constructor(
         address _channelHost,
-        address _tickets,
-        address _token
+        address _ticketsAddress,
+        address _token,
+        address _treasury
     ) Ownable(msg.sender) {
-        tickets = Tickets(_tickets);
+        tickets = Tickets(_ticketsAddress);
         token = IERC20(_token);
         channelHost = _channelHost;
+        protocolTreasury = _treasury;
     }
 
     /// @notice recover the signer from the hash and signature
@@ -76,20 +85,13 @@ contract Game is Ownable {
     function buy(
         string memory castHash,
         address castCreator,
-        uint256 amount,
         uint256 price,
         bytes memory signature
     ) external {
         if (!isActive || block.number > endBlock) revert GameNotActive();
 
         bytes32 hash = keccak256(
-            abi.encodePacked(
-                castHash,
-                castCreator,
-                amount,
-                price,
-                nonce[castHash]
-            )
+            abi.encodePacked(castHash, castCreator, price, nonce[castHash])
         );
 
         verifySignature(signature, hash);
@@ -106,17 +108,51 @@ contract Game is Ownable {
         token.transferFrom(msg.sender, protocolTreasury, protocolFee);
         token.transferFrom(msg.sender, castCreator, creatorFee);
 
-        // Mint ERC1155
-        tickets.mint(msg.sender, castHash, amount);
-
-        emit Purchase(
+        // Transfer payment
+        token.transferFrom(
             msg.sender,
-            castHash,
-            amount,
-            price,
-            protocolFee,
-            creatorFee
+            address(this),
+            price - protocolFee - creatorFee
         );
+
+        // Mint ERC1155
+        tickets.mint(msg.sender, castHash, 1);
+
+        emit Purchased(msg.sender, castHash, price, protocolFee, creatorFee);
+    }
+
+    function sell(
+        string memory castHash,
+        address castCreator,
+        uint256 price,
+        bytes memory signature
+    ) external {
+        if (!isActive || block.number > endBlock) revert GameNotActive();
+
+        bytes32 hash = keccak256(
+            abi.encodePacked(castHash, castCreator, price, nonce[castHash])
+        );
+
+        verifySignature(signature, hash);
+        nonce[castHash]++;
+
+        // Calculate fees
+        uint256 protocolFee = (price * protocolFeePercent) / 1 ether;
+        uint256 creatorFee = (price * creatorFeePercent) / 1 ether;
+
+        // Transfer fees
+        token.transfer(protocolTreasury, protocolFee);
+        token.transfer(castCreator, creatorFee);
+
+        // Transfer payment
+        uint256 finalSellAmount = price - protocolFee - creatorFee;
+
+        token.transfer(msg.sender, finalSellAmount);
+
+        // Burn ERC1155
+        tickets.burn(msg.sender, castHash, 1);
+
+        emit Sold(msg.sender, castHash, price, protocolFee, creatorFee);
     }
 
     // Admin functions
@@ -149,7 +185,7 @@ contract Game is Ownable {
 
         // Distribute the rest of the prize pool to ticket holders
         uint256 remainingPool = token.balanceOf(address(this));
-        
+
         for (uint256 i = 0; i < ticketHolders.length; i++) {
             token.transferFrom(
                 address(this),
