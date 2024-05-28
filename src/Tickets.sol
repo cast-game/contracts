@@ -7,8 +7,11 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 contract Tickets is ERC1155, Ownable {
     address public gameContract;
     uint256 public latestTokenId;
+
     // cast hash -> token id
     mapping(string => uint256) public castTokenId;
+    // token id -> supply
+    mapping(uint256 => uint256) public supply;
     // token id -> uri
     mapping(uint256 => string) public uris;
 
@@ -41,7 +44,20 @@ contract Tickets is ERC1155, Ownable {
         if (tokenId == 0) tokenId = latestTokenId++;
 
         castTokenId[castHash] = tokenId;
+        supply[tokenId] += amount;
 
         _mint(account, tokenId, amount, "");
+    }
+
+    function burn(
+        address account,
+        string memory castHash,
+        uint256 amount
+    ) external {
+        if (msg.sender != gameContract) revert NotContract();
+        uint256 tokenId = castTokenId[castHash];
+        supply[tokenId] -= amount;
+
+        _burn(account, tokenId, amount);
     }
 }
