@@ -21,7 +21,7 @@ contract GameTest is Test {
     address public alice = address(3);
     address public bob = address(4);
 
-    ERC20 public token;
+    MockERC20 public token;
     Game public game;
     Tickets public tickets;
 
@@ -31,7 +31,12 @@ contract GameTest is Test {
         token = new MockERC20();
         tickets = new Tickets();
 
-        game = new Game(channelHost, address(tickets), address(token));
+        game = new Game(
+            channelHost,
+            address(tickets),
+            address(token),
+            protocolTreasury
+        );
         game.startGame(1000);
 
         tickets.setGameContract(address(game));
@@ -41,11 +46,10 @@ contract GameTest is Test {
         string memory castHash,
         address castCreator,
         uint256 price,
-        uint256 amount,
         uint256 nonce
     ) internal view returns (bytes memory) {
         bytes32 hash = keccak256(
-            abi.encodePacked(castHash, castCreator, price, amount, nonce)
+            abi.encodePacked(castHash, castCreator, price, nonce)
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(
             ownerPk,
@@ -65,7 +69,12 @@ contract GameTest is Test {
     function test_VerifySignature() public {
         vm.startPrank(owner);
         bytes32 hash = keccak256(
-            abi.encodePacked("0x1", address(alice), uint256(1 ether), uint256(0)) // nonce starts at 0
+            abi.encodePacked(
+                "0x1",
+                address(alice),
+                uint256(1 ether),
+                uint256(0)
+            ) // nonce starts at 0
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(
             ownerPk,
@@ -80,12 +89,42 @@ contract GameTest is Test {
         assertEq(signer, owner);
     }
 
-    function test_BuyTicket() public {
+    function test_Buy() public {
+        vm.startPrank(alice);
+        token.mint(1.1 ether);
+
         // TODO: determine price
         uint256 price = 1 ether;
+        token.approve(address(game), price);
 
-        
+        bytes memory signature = generateSignature("0x1", bob, price, 0);
+        game.buy("0x1", bob, price, signature);
+
+        assertEq(tickets.balanceOf(alice, 0), 1);
+        assertEq(tickets.supply(0), 1);
     }
 
-    // TODO: test bonding curve
+    function test_Sell() public {
+        vm.startPrank(alice);
+        token.mint(3 ether);
+
+        // Buying a ticket
+        uint256 price = 2 ether;
+        token.approve(address(game), price);
+
+        bytes memory signature = generateSignature("0x1", bob, price, 0);
+        game.buy("0x1", bob, price, signature);
+
+        // Selling a ticket
+        uint256 sellPrice = 1 ether;
+        signature = generateSignature("0x1", bob, sellPrice, 1);
+        game.sell("0x1", bob, sellPrice, signature);
+
+        assertEq(tickets.balanceOf(alice, 0), 0);
+        assertEq(tickets.supply(0), 0);
+
+        uint256 accumulatedFees = ((price + sellPrice) *
+            game.creatorFeePercent()) / 1 ether;
+        assertEq(token.balanceOf(bob), accumulatedFees);
+    }
 }
