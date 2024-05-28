@@ -20,6 +20,7 @@ contract GameTest is Test {
 
     address public alice = address(3);
     address public bob = address(4);
+    address public john = address(5);
 
     MockERC20 public token;
     Game public game;
@@ -37,7 +38,7 @@ contract GameTest is Test {
             address(token),
             protocolTreasury
         );
-        game.startGame(1000);
+        game.startGame(block.number + 1000, block.number + 2000);
 
         tickets.setMinter(address(game));
     }
@@ -139,5 +140,18 @@ contract GameTest is Test {
         uint256 accumulatedFees = ((price + sellPrice) *
             game.creatorFeePercent()) / 1 ether;
         assertEq(token.balanceOf(bob), accumulatedFees);
+    }
+
+    function test_Referral() public {
+        vm.startPrank(alice);
+        token.mint(1.1 ether);
+
+        uint256 price = 1 ether;
+        token.approve(address(game), price);
+
+        bytes memory signature = generateSignature("0x1", bob, price, john, 0);
+        game.buy("0x1", bob, price, john, signature);
+
+        assertEq(token.balanceOf(john), 0.05 ether);
     }
 }
