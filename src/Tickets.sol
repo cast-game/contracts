@@ -41,7 +41,7 @@ contract Tickets is ERC1155, Ownable {
     ) external {
         if (msg.sender != minter) revert NotAuthorized();
         uint256 tokenId = castTokenId[castHash];
-        if (tokenId == 0) tokenId = latestTokenId++;
+        if (tokenId == 0) tokenId = ++latestTokenId;
 
         castTokenId[castHash] = tokenId;
         supply[tokenId] += amount;
