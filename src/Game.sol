@@ -40,6 +40,7 @@ contract Game is Ownable {
     event Purchased(
         address indexed buyer,
         string indexed castHash,
+        uint256 amount,
         uint256 price,
         uint256 protocolFee,
         uint256 creatorFee
@@ -48,6 +49,7 @@ contract Game is Ownable {
     event Sold(
         address indexed seller,
         string indexed castHash,
+        uint256 amount,
         uint256 price,
         uint256 protocolFee,
         uint256 creatorFee
@@ -92,6 +94,16 @@ contract Game is Ownable {
         isActive = _isActive;
     }
 
+    function updateChannelHost(address _channelHost) external onlyOwner {
+        channelHost = _channelHost;
+    }
+
+    function updateProtocolTreasury(
+        address _protocolTreasury
+    ) external onlyOwner {
+        protocolTreasury = _protocolTreasury;
+    }
+
     function payout(
         address[] calldata winners,
         uint256[] calldata amounts
@@ -125,7 +137,10 @@ contract Game is Ownable {
         if (!isActive || block.number > tradingEndBlock) revert GameNotActive();
 
         uint256 tokenId = tickets.castTokenId(castHash);
-        if (tokenId != 0 && tickets.supply(tokenId) + amount > TICKETS_MAX_SUPPLY) revert MaxSupply();
+        if (
+            tokenId != 0 &&
+            tickets.supply(tokenId) + amount > TICKETS_MAX_SUPPLY
+        ) revert MaxSupply();
 
         bytes32 hash = keccak256(
             abi.encodePacked(
@@ -166,12 +181,20 @@ contract Game is Ownable {
         // Mint ERC1155
         tickets.mint(msg.sender, castHash, amount);
 
-        emit Purchased(msg.sender, castHash, amount, price, protocolFee, creatorFee);
+        emit Purchased(
+            msg.sender,
+            castHash,
+            amount,
+            price,
+            protocolFee,
+            creatorFee
+        );
     }
 
     function sell(
         string memory castHash,
         address castCreator,
+        uint256 amount,
         uint256 price,
         address referrer,
         bytes memory signature
@@ -182,6 +205,7 @@ contract Game is Ownable {
             abi.encodePacked(
                 castHash,
                 castCreator,
+                amount,
                 price,
                 referrer,
                 nonce[castHash]
@@ -211,8 +235,8 @@ contract Game is Ownable {
         token.transfer(msg.sender, finalSellAmount);
 
         // Burn ERC1155
-        tickets.burn(msg.sender, castHash, 1);
+        tickets.burn(msg.sender, castHash, amount);
 
-        emit Sold(msg.sender, castHash, price, protocolFee, creatorFee);
+        emit Sold(msg.sender, castHash, amount, price, protocolFee, creatorFee);
     }
 }
