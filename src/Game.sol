@@ -16,6 +16,8 @@ contract Game is Ownable {
     address public protocolTreasury;
     address public channelHost;
 
+    uint256 constant TICKETS_MAX_SUPPLY = 100;
+
     // 5% protocol fee
     uint256 public protocolFeePercent = 0.05 ether;
     // 5% creator fee (of transaction)
@@ -62,6 +64,7 @@ contract Game is Ownable {
     error GameNotActive();
     error GameNotOver();
     error InvalidSignature();
+    error MaxSupply();
 
     constructor(
         address _channelHost,
@@ -114,16 +117,21 @@ contract Game is Ownable {
     function buy(
         string memory castHash,
         address castCreator,
+        uint256 amount,
         uint256 price,
         address referrer,
         bytes memory signature
     ) external {
         if (!isActive || block.number > tradingEndBlock) revert GameNotActive();
 
+        uint256 tokenId = tickets.castTokenId(castHash);
+        if (tokenId != 0 && tickets.supply(tokenId) + amount > TICKETS_MAX_SUPPLY) revert MaxSupply();
+
         bytes32 hash = keccak256(
             abi.encodePacked(
                 castHash,
                 castCreator,
+                amount,
                 price,
                 referrer,
                 nonce[castHash]
@@ -156,9 +164,9 @@ contract Game is Ownable {
         token.transferFrom(msg.sender, address(this), amountAfterFees);
 
         // Mint ERC1155
-        tickets.mint(msg.sender, castHash, 1);
+        tickets.mint(msg.sender, castHash, amount);
 
-        emit Purchased(msg.sender, castHash, price, protocolFee, creatorFee);
+        emit Purchased(msg.sender, castHash, amount, price, protocolFee, creatorFee);
     }
 
     function sell(
