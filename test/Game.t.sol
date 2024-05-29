@@ -60,6 +60,20 @@ contract GameTest is Test {
         return abi.encodePacked(r, s, v);
     }
 
+    function test_BondingCurve() public view {
+        console.log(game.getPrice(0, 1, 25 ether));
+        console.log(game.getPrice(1, 1, 25 ether));
+        console.log(game.getPrice(2, 1, 25 ether));
+        console.log(game.getPrice(3, 1, 25 ether));
+        console.log(game.getPrice(4, 1, 25 ether));
+        console.log(game.getPrice(5, 1, 25 ether));
+        console.log(game.getPrice(6, 1, 25 ether));
+        console.log(game.getPrice(7, 1, 25 ether));
+        console.log(game.getPrice(8, 1, 25 ether));
+        console.log(game.getPrice(9, 1, 25 ether));
+        console.log(game.getPrice(10, 1, 25 ether));
+    }
+
     function test_UpdateGameStatus() public {
         game.updateGameStatus(false);
         assertEq(game.isActive(), false);
@@ -108,8 +122,8 @@ contract GameTest is Test {
         );
         game.buy("0x1", bob, price, address(0), signature);
 
-        assertEq(tickets.balanceOf(alice, 0), 1);
-        assertEq(tickets.supply(0), 1);
+        assertEq(tickets.balanceOf(alice, 1), 1);
+        assertEq(tickets.supply(1), 1);
     }
 
     function test_Sell() public {
@@ -134,8 +148,8 @@ contract GameTest is Test {
         signature = generateSignature("0x1", bob, sellPrice, address(0), 1);
         game.sell("0x1", bob, sellPrice, address(0), signature);
 
-        assertEq(tickets.balanceOf(alice, 0), 0);
-        assertEq(tickets.supply(0), 0);
+        assertEq(tickets.balanceOf(alice, 1), 0);
+        assertEq(tickets.supply(1), 0);
 
         uint256 accumulatedFees = ((price + sellPrice) *
             game.creatorFeePercent()) / 1 ether;
