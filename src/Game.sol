@@ -45,6 +45,7 @@ contract Game is Ownable {
         address indexed seller,
         string indexed castHash,
         address indexed castCreator,
+        address referrer,
         uint256 amount,
         uint256 price
     );
@@ -199,16 +200,15 @@ contract Game is Ownable {
         verifySignature(signature, hash);
         nonce[castHash]++;
 
-        // Calculate fees
-        uint256 protocolFee = (price * protocolFeePercent) / 1 ether;
-        uint256 creatorFee = (price * creatorFeePercent) / 1 ether;
+        uint256 feeAmount = (price * feePercent) / 1 ether;
 
         // Transfer fees
-        token.transfer(protocolTreasury, protocolFee);
-        token.transfer(castCreator, creatorFee);
+        token.transfer(protocolTreasury, feeAmount);
+        token.transfer(castCreator, feeAmount);
+        token.transfer(channelHost, feeAmount);
 
         // Optionally transfer referral fee
-        uint256 finalSellAmount = price - protocolFee - creatorFee;
+        uint256 finalSellAmount = price - (feeAmount * 3);
         if (referrer != address(0)) {
             uint256 referralFee = (price * referralFeePercent) / 1 ether;
             token.transfer(referrer, referralFee);
@@ -221,6 +221,6 @@ contract Game is Ownable {
         // Burn ERC1155
         tickets.burn(msg.sender, castHash, amount);
 
-        emit Sold(msg.sender, castHash, amount, price, protocolFee, creatorFee);
+        emit Sold(msg.sender, castHash, castCreator, referrer, amount, price);
     }
 }
