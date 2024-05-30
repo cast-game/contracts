@@ -18,19 +18,14 @@ contract Game is Ownable {
 
     uint256 constant TICKETS_MAX_SUPPLY = 100;
 
-    // 5% protocol fee
-    uint256 public protocolFeePercent = 0.05 ether;
-    // 5% creator fee (of transaction)
-    uint256 public creatorFeePercent = 0.05 ether;
-    // 5% referral fee
-    uint256 public referralFeePercent = 0.05 ether;
+    /// @notice transaction fees
+    uint256 public feePercent = 0.05 ether;
+    uint256 public referralFeePercent = 0.1 ether;
 
-    // 5% channel host fee (of final prize pool)
-    uint256 public hostFeePercent = 0.05 ether;
-    // 15% winning cast creator fee (of final prize pool)
+    // of final prize pool
     uint256 public winnningCreatorFeePercent = 0.15 ether;
 
-    bool public isActive = false;
+    bool public isPaused = false;
     uint256 public tradingEndBlock;
     uint256 public endBlock;
 
@@ -40,19 +35,18 @@ contract Game is Ownable {
     event Purchased(
         address indexed buyer,
         string indexed castHash,
+        address indexed castCreator,
+        address referrer,
         uint256 amount,
-        uint256 price,
-        uint256 protocolFee,
-        uint256 creatorFee
+        uint256 price
     );
 
     event Sold(
         address indexed seller,
         string indexed castHash,
+        address indexed castCreator,
         uint256 amount,
-        uint256 price,
-        uint256 protocolFee,
-        uint256 creatorFee
+        uint256 price
     );
 
     event GameEnded(
@@ -85,13 +79,13 @@ contract Game is Ownable {
         uint256 _tradingEndBlock,
         uint256 _endBlock
     ) external onlyOwner {
-        isActive = true;
+        isPaused = false;
         tradingEndBlock = _tradingEndBlock;
         endBlock = _endBlock;
     }
 
-    function updateGameStatus(bool _isActive) external onlyOwner {
-        isActive = _isActive;
+    function updateGameStatus(bool _isPaused) external onlyOwner {
+        isPaused = _isPaused;
     }
 
     function updateChannelHost(address _channelHost) external onlyOwner {
@@ -134,13 +128,7 @@ contract Game is Ownable {
         address referrer,
         bytes memory signature
     ) external {
-        if (!isActive || block.number > tradingEndBlock) revert GameNotActive();
-
-        uint256 tokenId = tickets.castTokenId(castHash);
-        if (
-            tokenId != 0 &&
-            tickets.supply(tokenId) + amount > TICKETS_MAX_SUPPLY
-        ) revert MaxSupply();
+        if (isPaused || block.number > tradingEndBlock) revert GameNotActive();
 
         bytes32 hash = keccak256(
             abi.encodePacked(
@@ -156,19 +144,15 @@ contract Game is Ownable {
         verifySignature(signature, hash);
         nonce[castHash]++;
 
-        // Calculate fees
-        uint256 protocolFee = (price * protocolFeePercent) / 1 ether;
-        uint256 creatorFee = (price * creatorFeePercent) / 1 ether;
-
-        if (token.balanceOf(msg.sender) < price + protocolFee + creatorFee)
-            revert InsufficientPayment();
+        uint256 feeAmount = (price * feePercent) / 1 ether;
 
         // Transfer fees
-        token.transferFrom(msg.sender, protocolTreasury, protocolFee);
-        token.transferFrom(msg.sender, castCreator, creatorFee);
+        token.transferFrom(msg.sender, protocolTreasury, feeAmount);
+        token.transferFrom(msg.sender, castCreator, feeAmount);
+        token.transferFrom(msg.sender, channelHost, feeAmount);
 
         // Optionally transfer referral fee
-        uint256 amountAfterFees = price - protocolFee - creatorFee;
+        uint256 amountAfterFees = price - (feeAmount * 3);
         if (referrer != address(0)) {
             uint256 referralFee = (price * referralFeePercent) / 1 ether;
             token.transferFrom(msg.sender, referrer, referralFee);
@@ -184,10 +168,10 @@ contract Game is Ownable {
         emit Purchased(
             msg.sender,
             castHash,
+            castCreator,
+            referrer,
             amount,
-            price,
-            protocolFee,
-            creatorFee
+            price
         );
     }
 
@@ -199,7 +183,7 @@ contract Game is Ownable {
         address referrer,
         bytes memory signature
     ) external {
-        if (!isActive || block.number > tradingEndBlock) revert GameNotActive();
+        if (isPaused || block.number > tradingEndBlock) revert GameNotActive();
 
         bytes32 hash = keccak256(
             abi.encodePacked(
