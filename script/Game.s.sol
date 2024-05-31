@@ -21,6 +21,7 @@ contract GameScript is Script {
         vm.startBroadcast(deployerPrivateKey);
         Tickets tickets = new Tickets();
         Game game = new Game(
+            "test",
             channelHost,
             address(tickets),
             tokenAddress,
@@ -28,5 +29,7 @@ contract GameScript is Script {
         );
 
         tickets.setMinter(address(game));
+        // remove in prod
+        game.startGame(1748697936, 1748697937);
     }
 }
