@@ -15,6 +15,7 @@ contract Game is Ownable {
 
     address public protocolTreasury;
     address public channelHost;
+    string public channelId;
 
     uint256 constant TICKETS_MAX_SUPPLY = 100;
 
@@ -26,8 +27,8 @@ contract Game is Ownable {
     uint256 public winnningCreatorFeePercent = 0.15 ether;
 
     bool public isPaused = false;
-    uint256 public tradingEndBlock;
-    uint256 public endBlock;
+    uint256 public tradingEndTime;
+    uint256 public endTime;
 
     // Nonce to ensure hashes are unique per transaction
     mapping(string => uint256) public nonce;
@@ -50,6 +51,11 @@ contract Game is Ownable {
         uint256 price
     );
 
+    event GameStarted(
+        uint256 tradingEndTime,
+        uint256 endTime
+    );
+
     event GameEnded(
         string indexed castHash,
         address indexed winningCreator,
@@ -62,8 +68,10 @@ contract Game is Ownable {
     error GameNotOver();
     error InvalidSignature();
     error MaxSupply();
+    error InvalidParams();
 
     constructor(
+        string memory _channelId,
         address _channelHost,
         address _ticketsAddress,
         address _token,
@@ -71,18 +79,27 @@ contract Game is Ownable {
     ) Ownable(msg.sender) {
         tickets = Tickets(_ticketsAddress);
         token = IERC20(_token);
+        channelId = _channelId;
         channelHost = _channelHost;
         protocolTreasury = _treasury;
     }
 
     // Admin functions
     function startGame(
-        uint256 _tradingEndBlock,
-        uint256 _endBlock
+        uint256 _tradingEndTime,
+        uint256 _endTime
     ) external onlyOwner {
+        if (
+            _tradingEndTime < block.number ||
+            _endTime < block.number ||
+            _endTime < _tradingEndTime
+        ) revert InvalidParams();
+
         isPaused = false;
-        tradingEndBlock = _tradingEndBlock;
-        endBlock = _endBlock;
+        tradingEndTime = _tradingEndTime;
+        endTime = _endTime;
+
+        emit GameStarted(_tradingEndTime, _endTime);
     }
 
     function updateGameStatus(bool _isPaused) external onlyOwner {
@@ -103,7 +120,7 @@ contract Game is Ownable {
         address[] calldata winners,
         uint256[] calldata amounts
     ) external onlyOwner {
-        if (block.number < endBlock) revert GameNotOver();
+        if (block.number < endTime) revert GameNotOver();
 
         for (uint256 i = 0; i < winners.length; i++) {
             token.transfer(winners[i], amounts[i]);
@@ -129,7 +146,7 @@ contract Game is Ownable {
         address referrer,
         bytes memory signature
     ) external {
-        if (isPaused || block.number > tradingEndBlock) revert GameNotActive();
+        if (isPaused || block.number > tradingEndTime) revert GameNotActive();
 
         bytes32 hash = keccak256(
             abi.encodePacked(
@@ -184,7 +201,7 @@ contract Game is Ownable {
         address referrer,
         bytes memory signature
     ) external {
-        if (isPaused || block.number > tradingEndBlock) revert GameNotActive();
+        if (isPaused || block.number > tradingEndTime) revert GameNotActive();
 
         bytes32 hash = keccak256(
             abi.encodePacked(
