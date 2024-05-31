@@ -10,6 +10,8 @@ contract Tickets is ERC1155, Ownable {
 
     // cast hash -> token id
     mapping(string => uint256) public castTokenId;
+    // token id -> cast hash
+    mapping(uint256 => string) public castHashes;
     // token id -> supply
     mapping(uint256 => uint256) public supply;
     // token id -> uri
@@ -44,6 +46,7 @@ contract Tickets is ERC1155, Ownable {
         if (tokenId == 0) tokenId = ++latestTokenId;
 
         castTokenId[castHash] = tokenId;
+        castHashes[tokenId] = castHash;
         supply[tokenId] += amount;
 
         _mint(account, tokenId, amount, "");
