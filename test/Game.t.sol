@@ -33,6 +33,7 @@ contract GameTest is Test {
         tickets = new Tickets();
 
         game = new Game(
+            "test",
             channelHost,
             address(tickets),
             address(token),
@@ -69,11 +70,11 @@ contract GameTest is Test {
     }
 
     function test_UpdateGameStatus() public {
-        game.updateGameStatus(false);
-        assertEq(game.isActive(), false);
-
         game.updateGameStatus(true);
-        assertEq(game.isActive(), true);
+        assertEq(game.isPaused(), true);
+
+        game.updateGameStatus(false);
+        assertEq(game.isPaused(), false);
     }
 
     function test_VerifySignature() public {
@@ -110,7 +111,7 @@ contract GameTest is Test {
         bytes memory signature = generateSignature(
             "0x1",
             bob,
-            1, 
+            1,
             price,
             address(0),
             0
@@ -132,7 +133,7 @@ contract GameTest is Test {
         bytes memory signature = generateSignature(
             "0x1",
             bob,
-            1, 
+            1,
             price,
             address(0),
             0
@@ -147,8 +148,8 @@ contract GameTest is Test {
         assertEq(tickets.balanceOf(alice, 1), 0);
         assertEq(tickets.supply(1), 0);
 
-        uint256 accumulatedFees = ((price + sellPrice) *
-            game.creatorFeePercent()) / 1 ether;
+        uint256 accumulatedFees = ((price + sellPrice) * game.creatorFeePercent()) /
+            1 ether;
         assertEq(token.balanceOf(bob), accumulatedFees);
     }
 
@@ -159,9 +160,17 @@ contract GameTest is Test {
         uint256 price = 1 ether;
         token.approve(address(game), price);
 
-        bytes memory signature = generateSignature("0x1", bob, 1, price, john, 0);
+        bytes memory signature = generateSignature(
+            "0x1",
+            bob,
+            1,
+            price,
+            john,
+            0
+        );
+
         game.buy("0x1", bob, 1, price, john, signature);
 
-        assertEq(token.balanceOf(john), 0.05 ether);
+        assertEq(token.balanceOf(john), (price * game.referralFeePercent()) / 1 ether);
     }
 }
