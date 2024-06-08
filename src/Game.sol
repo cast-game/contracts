@@ -26,7 +26,7 @@ contract Game is Ownable {
     // of final prize pool
     uint256 public winnningCreatorFeePercent = 0.15 ether;
 
-    bool public isPaused = false;
+    bool public isPaused;
     uint256 public tradingEndTime;
     uint256 public endTime;
 
@@ -35,8 +35,8 @@ contract Game is Ownable {
 
     event Purchased(
         address indexed buyer,
-        string indexed castHash,
         address indexed castCreator,
+        string castHash,
         address referrer,
         uint256 amount,
         uint256 price
@@ -44,8 +44,8 @@ contract Game is Ownable {
 
     event Sold(
         address indexed seller,
-        string indexed castHash,
         address indexed castCreator,
+        string castHash,
         address referrer,
         uint256 amount,
         uint256 price
@@ -54,12 +54,6 @@ contract Game is Ownable {
     event GameStarted(
         uint256 tradingEndTime,
         uint256 endTime
-    );
-
-    event GameEnded(
-        string indexed castHash,
-        address indexed winningCreator,
-        address[] ticketHolders
     );
 
     error InsufficientPayment();
