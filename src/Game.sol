@@ -22,9 +22,7 @@ contract Game is Ownable {
     /// @notice transaction fees
     uint256 public feePercent = 0.05 ether;
     uint256 public referralFeePercent = 0.1 ether;
-
-    // of final prize pool
-    uint256 public winnningCreatorFeePercent = 0.15 ether;
+    uint256 public creatorFeePercent = 0.1 ether;
 
     bool public isPaused;
     uint256 public tradingEndTime;
@@ -51,10 +49,7 @@ contract Game is Ownable {
         uint256 price
     );
 
-    event GameStarted(
-        uint256 tradingEndTime,
-        uint256 endTime
-    );
+    event GameStarted(uint256 tradingEndTime, uint256 endTime);
 
     error InsufficientPayment();
     error TransferFailed();
@@ -156,31 +151,40 @@ contract Game is Ownable {
         verifySignature(signature, hash);
         nonce[castHash]++;
 
-        uint256 feeAmount = (price * feePercent) / 1 ether;
-
         // Transfer fees
-        token.transferFrom(msg.sender, protocolTreasury, feeAmount);
-        token.transferFrom(msg.sender, castCreator, feeAmount);
-        token.transferFrom(msg.sender, channelHost, feeAmount);
-
-        // Optionally transfer referral fee
-        uint256 amountAfterFees = price - (feeAmount * 3);
         if (referrer != address(0)) {
             uint256 referralFee = (price * referralFeePercent) / 1 ether;
+            uint256 feeAmount = ((price * feePercent) / 1 ether) / 2;
+            uint256 creatorFeeAmount = ((price * creatorFeePercent) / 1 ether) /
+                2;
+
+            token.transferFrom(msg.sender, protocolTreasury, feeAmount);
+            token.transferFrom(msg.sender, channelHost, feeAmount);
+            token.transferFrom(msg.sender, castCreator, creatorFeeAmount);
             token.transferFrom(msg.sender, referrer, referralFee);
-            amountAfterFees -= referralFee;
+        } else {
+            uint256 feeAmount = (price * feePercent) / 1 ether;
+            uint256 creatorFeeAmount = (price * creatorFeePercent) / 1 ether;
+
+            token.transferFrom(msg.sender, protocolTreasury, feeAmount);
+            token.transferFrom(msg.sender, channelHost, feeAmount);
+            token.transferFrom(msg.sender, castCreator, creatorFeeAmount);
         }
 
         // Transfer payment
-        token.transferFrom(msg.sender, address(this), amountAfterFees);
+        token.transferFrom(
+            msg.sender,
+            address(this),
+            (price * .8 ether) / 1 ether
+        );
 
         // Mint ERC1155
         tickets.mint(msg.sender, castHash, amount);
 
         emit Purchased(
             msg.sender,
-            castHash,
             castCreator,
+            castHash,
             referrer,
             amount,
             price
@@ -211,27 +215,32 @@ contract Game is Ownable {
         verifySignature(signature, hash);
         nonce[castHash]++;
 
-        uint256 feeAmount = (price * feePercent) / 1 ether;
-
         // Transfer fees
-        token.transfer(protocolTreasury, feeAmount);
-        token.transfer(castCreator, feeAmount);
-        token.transfer(channelHost, feeAmount);
-
-        // Optionally transfer referral fee
-        uint256 finalSellAmount = price - (feeAmount * 3);
         if (referrer != address(0)) {
             uint256 referralFee = (price * referralFeePercent) / 1 ether;
+            uint256 feeAmount = ((price * feePercent) / 1 ether) / 2;
+            uint256 creatorFeeAmount = ((price * creatorFeePercent) / 1 ether) /
+                2;
+
+            token.transfer(protocolTreasury, feeAmount);
+            token.transfer(channelHost, feeAmount);
+            token.transfer(castCreator, creatorFeeAmount);
             token.transfer(referrer, referralFee);
-            finalSellAmount -= referralFee;
+        } else {
+            uint256 feeAmount = (price * feePercent) / 1 ether;
+            uint256 creatorFeeAmount = (price * creatorFeePercent) / 1 ether;
+
+            token.transfer(protocolTreasury, feeAmount);
+            token.transfer(channelHost, feeAmount);
+            token.transfer(castCreator, creatorFeeAmount);
         }
 
         // Transfer payment
-        token.transfer(msg.sender, finalSellAmount);
+        token.transfer(msg.sender, (price * .8 ether) / 1 ether);
 
         // Burn ERC1155
         tickets.burn(msg.sender, castHash, amount);
 
-        emit Sold(msg.sender, castHash, castCreator, referrer, amount, price);
+        emit Sold(msg.sender, castCreator, castHash, referrer, amount, price);
     }
 }
