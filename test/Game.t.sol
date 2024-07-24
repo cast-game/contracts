@@ -7,7 +7,6 @@ import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 import "../src/Game.sol";
 import "../src/Tickets.sol";
-import "../src/MockERC20.sol";
 
 contract GameTest is Test {
     using ECDSA for bytes32;
@@ -22,26 +21,24 @@ contract GameTest is Test {
     address public bob = address(4);
     address public john = address(5);
 
-    MockERC20 public token;
     Game public game;
     Tickets public tickets;
 
     function setUp() public {
         vm.startPrank(owner);
 
-        token = new MockERC20();
         tickets = new Tickets();
 
         game = new Game(
             "test",
             channelHost,
             address(tickets),
-            address(token),
             protocolTreasury
         );
         game.startGame(block.number + 1000, block.number + 2000);
 
         tickets.setMinter(address(game));
+        vm.deal(alice, 3 ether);
     }
 
     function generateSignature(
@@ -102,11 +99,9 @@ contract GameTest is Test {
 
     function test_Buy() public {
         vm.startPrank(alice);
-        token.mint(1.1 ether);
 
         // TODO: determine price
         uint256 price = 1 ether;
-        token.approve(address(game), price);
 
         bytes memory signature = generateSignature(
             "0x1",
@@ -116,7 +111,7 @@ contract GameTest is Test {
             address(0),
             0
         );
-        game.buy("0x1", bob, 1, price, address(0), signature);
+        game.buy{value: price}("0x1", bob, 1, price, address(0), signature);
 
         assertEq(tickets.balanceOf(alice, 1), 1);
         assertEq(tickets.supply(1), 1);
@@ -124,11 +119,9 @@ contract GameTest is Test {
 
     function test_Sell() public {
         vm.startPrank(alice);
-        token.mint(3 ether);
 
         // Buying a ticket
         uint256 price = 2 ether;
-        token.approve(address(game), price);
 
         bytes memory signature = generateSignature(
             "0x1",
@@ -138,27 +131,32 @@ contract GameTest is Test {
             address(0),
             0
         );
-        game.buy("0x1", bob, 1, price, address(0), signature);
+        game.buy{value: price}("0x1", bob, 1, price, address(0), signature);
 
         // Selling a ticket
         uint256 sellPrice = 1 ether;
         signature = generateSignature("0x1", bob, 1, sellPrice, address(0), 1);
         game.sell("0x1", bob, 1, sellPrice, address(0), signature);
 
+        // Check ticket balances
         assertEq(tickets.balanceOf(alice, 1), 0);
         assertEq(tickets.supply(1), 0);
 
-        uint256 accumulatedFees = ((price + sellPrice) * game.creatorFeePercent()) /
-            1 ether;
-        assertEq(token.balanceOf(bob), accumulatedFees);
+        // Calculate expected ETH balances
+        uint256 accumulatedFees = ((price + sellPrice) *
+            game.creatorFeePercent()) / 1 ether;
+
+        // Check ETH balances
+        assertEq(address(alice).balance, 1.8 ether);
+        assertEq(address(bob).balance, accumulatedFees);
+
+        vm.stopPrank();
     }
 
     function test_Referral() public {
         vm.startPrank(alice);
-        token.mint(1.1 ether);
 
         uint256 price = 1 ether;
-        token.approve(address(game), price);
 
         bytes memory signature = generateSignature(
             "0x1",
@@ -169,8 +167,11 @@ contract GameTest is Test {
             0
         );
 
-        game.buy("0x1", bob, 1, price, john, signature);
+        game.buy{value: price}("0x1", bob, 1, price, john, signature);
 
-        assertEq(token.balanceOf(john), (price * game.referralFeePercent()) / 1 ether);
+        assertEq(
+            address(john).balance,
+            (price * game.referralFeePercent()) / 1 ether
+        );
     }
 }
