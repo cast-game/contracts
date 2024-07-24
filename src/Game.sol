@@ -133,7 +133,7 @@ contract Game is Ownable {
         address referrer,
         bytes memory signature
     ) external payable {
-        // TODO: require msg.value == price
+        if (msg.value != price) revert InsufficientPayment();
         if (isPaused || block.number > tradingEndTime) revert GameNotActive();
 
         bytes32 hash = keccak256(
@@ -171,13 +171,6 @@ contract Game is Ownable {
             (bool success2, ) = castCreator.call{value: creatorFeeAmount}("");
             require(success0 && success1 && success2, "Transfer failed");
         }
-
-        // Transfer payment
-        // token.transferFrom(
-        //     msg.sender,
-        //     address(this),
-        //     (price * .8 ether) / 1 ether
-        // );
 
         // Mint ERC1155
         tickets.mint(msg.sender, castHash, amount);
