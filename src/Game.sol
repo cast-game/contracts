@@ -4,14 +4,12 @@ pragma solidity ^0.8.25;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./Tickets.sol";
 
 contract Game is Ownable {
     using ECDSA for bytes32;
 
     Tickets public tickets;
-    IERC20 public token;
 
     address public protocolTreasury;
     address public channelHost;
@@ -63,11 +61,9 @@ contract Game is Ownable {
         string memory _channelId,
         address _channelHost,
         address _ticketsAddress,
-        address _token,
         address _treasury
     ) Ownable(msg.sender) {
         tickets = Tickets(_ticketsAddress);
-        token = IERC20(_token);
         channelId = _channelId;
         channelHost = _channelHost;
         protocolTreasury = _treasury;
@@ -112,7 +108,9 @@ contract Game is Ownable {
         if (block.number < endTime) revert GameNotOver();
 
         for (uint256 i = 0; i < winners.length; i++) {
-            token.transfer(winners[i], amounts[i]);
+            (bool success, ) = winners[i].call{value: amounts[i]}("");
+            // remove if gas too high
+            require(success, "Transfer failed");
         }
     }
 
@@ -134,7 +132,8 @@ contract Game is Ownable {
         uint256 price,
         address referrer,
         bytes memory signature
-    ) external {
+    ) external payable {
+        // TODO: require msg.value == price
         if (isPaused || block.number > tradingEndTime) revert GameNotActive();
 
         bytes32 hash = keccak256(
@@ -158,25 +157,27 @@ contract Game is Ownable {
             uint256 creatorFeeAmount = ((price * creatorFeePercent) / 1 ether) /
                 2;
 
-            token.transferFrom(msg.sender, protocolTreasury, feeAmount);
-            token.transferFrom(msg.sender, channelHost, feeAmount);
-            token.transferFrom(msg.sender, castCreator, creatorFeeAmount);
-            token.transferFrom(msg.sender, referrer, referralFee);
+            (bool success0, ) = protocolTreasury.call{value: feeAmount}("");
+            (bool success1, ) = channelHost.call{value: feeAmount}("");
+            (bool success2, ) = castCreator.call{value: creatorFeeAmount}("");
+            (bool success3, ) = referrer.call{value: referralFee}("");
+            require(success0 && success1 && success2 && success3, "Transfer failed");
         } else {
             uint256 feeAmount = (price * feePercent) / 1 ether;
             uint256 creatorFeeAmount = (price * creatorFeePercent) / 1 ether;
 
-            token.transferFrom(msg.sender, protocolTreasury, feeAmount);
-            token.transferFrom(msg.sender, channelHost, feeAmount);
-            token.transferFrom(msg.sender, castCreator, creatorFeeAmount);
+            (bool success0, ) = protocolTreasury.call{value: feeAmount}("");
+            (bool success1, ) = channelHost.call{value: feeAmount}("");
+            (bool success2, ) = castCreator.call{value: creatorFeeAmount}("");
+            require(success0 && success1 && success2, "Transfer failed");
         }
 
         // Transfer payment
-        token.transferFrom(
-            msg.sender,
-            address(this),
-            (price * .8 ether) / 1 ether
-        );
+        // token.transferFrom(
+        //     msg.sender,
+        //     address(this),
+        //     (price * .8 ether) / 1 ether
+        // );
 
         // Mint ERC1155
         tickets.mint(msg.sender, castHash, amount);
@@ -222,21 +223,24 @@ contract Game is Ownable {
             uint256 creatorFeeAmount = ((price * creatorFeePercent) / 1 ether) /
                 2;
 
-            token.transfer(protocolTreasury, feeAmount);
-            token.transfer(channelHost, feeAmount);
-            token.transfer(castCreator, creatorFeeAmount);
-            token.transfer(referrer, referralFee);
+            (bool success0, ) = protocolTreasury.call{value: feeAmount}("");
+            (bool success1, ) = channelHost.call{value: feeAmount}("");
+            (bool success2, ) = castCreator.call{value: creatorFeeAmount}("");
+            (bool success3, ) = referrer.call{value: referralFee}("");
+            require(success0 && success1 && success2 && success3, "Transfer failed");
         } else {
             uint256 feeAmount = (price * feePercent) / 1 ether;
             uint256 creatorFeeAmount = (price * creatorFeePercent) / 1 ether;
 
-            token.transfer(protocolTreasury, feeAmount);
-            token.transfer(channelHost, feeAmount);
-            token.transfer(castCreator, creatorFeeAmount);
+            (bool success0, ) = protocolTreasury.call{value: feeAmount}("");
+            (bool success1, ) = channelHost.call{value: feeAmount}("");
+            (bool success2, ) = castCreator.call{value: creatorFeeAmount}("");
+            require(success0 && success1 && success2, "Transfer failed");
         }
 
         // Transfer payment
-        token.transfer(msg.sender, (price * .8 ether) / 1 ether);
+        (bool success, ) = msg.sender.call{value: (price * .8 ether) / 1 ether}("");
+        require(success, "Transfer failed");
 
         // Burn ERC1155
         tickets.burn(msg.sender, castHash, amount);
