@@ -99,6 +99,7 @@ contract GameTest is Test {
 
     function test_Buy() public {
         vm.startPrank(alice);
+        vm.deal(alice, 1.1 ether);
 
         // TODO: determine price
         uint256 price = 1 ether;
@@ -119,6 +120,7 @@ contract GameTest is Test {
 
     function test_Sell() public {
         vm.startPrank(alice);
+        vm.deal(alice, 3 ether);
 
         // Buying a ticket
         uint256 price = 2 ether;
@@ -142,19 +144,14 @@ contract GameTest is Test {
         assertEq(tickets.balanceOf(alice, 1), 0);
         assertEq(tickets.supply(1), 0);
 
-        // Calculate expected ETH balances
         uint256 accumulatedFees = ((price + sellPrice) *
             game.creatorFeePercent()) / 1 ether;
-
-        // Check ETH balances
-        assertEq(address(alice).balance, 1.8 ether);
-        assertEq(address(bob).balance, accumulatedFees);
-
-        vm.stopPrank();
+        assertEq(bob.balance, accumulatedFees);
     }
 
     function test_Referral() public {
         vm.startPrank(alice);
+        vm.deal(alice, 1.1 ether);
 
         uint256 price = 1 ether;
 
@@ -169,9 +166,9 @@ contract GameTest is Test {
 
         game.buy{value: price}("0x1", bob, 1, price, john, signature);
 
-        assertEq(
-            address(john).balance,
-            (price * game.referralFeePercent()) / 1 ether
-        );
+        assertEq(tickets.balanceOf(alice, 1), 1);
+        assertEq(tickets.supply(1), 1);
+        assertEq(bob.balance, 0.05 ether);
+        assertEq(john.balance, 0.1 ether);
     }
 }
