@@ -44,6 +44,7 @@ contract GameTest is Test {
     function generateSignature(
         string memory castHash,
         address castCreator,
+        uint256 senderFid,
         uint256 amount,
         uint256 price,
         address referrer,
@@ -53,6 +54,7 @@ contract GameTest is Test {
             abi.encodePacked(
                 castHash,
                 castCreator,
+                senderFid,
                 amount,
                 price,
                 referrer,
@@ -104,15 +106,17 @@ contract GameTest is Test {
         // TODO: determine price
         uint256 price = 1 ether;
 
+        bytes memory data = abi.encode(bob, 123, 1, price, address(0));
         bytes memory signature = generateSignature(
             "0x1",
             bob,
+            123,
             1,
             price,
             address(0),
             0
         );
-        game.buy{value: price}("0x1", bob, 1, price, address(0), signature);
+        game.buy{value: price}("0x1", data, signature);
 
         assertEq(tickets.balanceOf(alice, 1), 1);
         assertEq(tickets.supply(1), 1);
@@ -125,20 +129,31 @@ contract GameTest is Test {
         // Buying a ticket
         uint256 price = 2 ether;
 
+        bytes memory data = abi.encode(bob, 123, 1, price, address(0));
         bytes memory signature = generateSignature(
             "0x1",
             bob,
+            123,
             1,
             price,
             address(0),
             0
         );
-        game.buy{value: price}("0x1", bob, 1, price, address(0), signature);
+        game.buy{value: price}("0x1", data, signature);
 
         // Selling a ticket
         uint256 sellPrice = 1 ether;
-        signature = generateSignature("0x1", bob, 1, sellPrice, address(0), 1);
-        game.sell("0x1", bob, 1, sellPrice, address(0), signature);
+        data = abi.encode(bob, 123, 1, sellPrice, address(0));
+        signature = generateSignature(
+            "0x1",
+            bob,
+            123,
+            1,
+            sellPrice,
+            address(0),
+            1
+        );
+        game.sell("0x1", data, signature);
 
         // Check ticket balances
         assertEq(tickets.balanceOf(alice, 1), 0);
@@ -155,16 +170,18 @@ contract GameTest is Test {
 
         uint256 price = 1 ether;
 
+        bytes memory data = abi.encode(bob, 123, 1, price, john);
         bytes memory signature = generateSignature(
             "0x1",
             bob,
+            123,
             1,
             price,
             john,
             0
         );
 
-        game.buy{value: price}("0x1", bob, 1, price, john, signature);
+        game.buy{value: price}("0x1", data, signature);
 
         assertEq(tickets.balanceOf(alice, 1), 1);
         assertEq(tickets.supply(1), 1);

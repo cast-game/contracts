@@ -32,6 +32,7 @@ contract Game is Ownable {
     event Purchased(
         address indexed buyer,
         address indexed castCreator,
+        uint256 indexed senderFid,
         string castHash,
         address referrer,
         uint256 amount,
@@ -41,6 +42,7 @@ contract Game is Ownable {
     event Sold(
         address indexed seller,
         address indexed castCreator,
+        uint256 indexed senderFid,
         string castHash,
         address referrer,
         uint256 amount,
@@ -127,12 +129,17 @@ contract Game is Ownable {
 
     function buy(
         string memory castHash,
-        address castCreator,
-        uint256 amount,
-        uint256 price,
-        address referrer,
+        bytes memory data,
         bytes memory signature
     ) external payable {
+        (
+            address castCreator,
+            uint256 senderFid,
+            uint256 amount,
+            uint256 price,
+            address referrer
+        ) = abi.decode(data, (address, uint256, uint256, uint256, address));
+
         if (msg.value != price) revert InsufficientPayment();
         if (isPaused || block.number > tradingEndTime) revert GameNotActive();
 
@@ -140,6 +147,7 @@ contract Game is Ownable {
             abi.encodePacked(
                 castHash,
                 castCreator,
+                senderFid,
                 amount,
                 price,
                 referrer,
@@ -161,7 +169,10 @@ contract Game is Ownable {
             (bool success1, ) = channelHost.call{value: feeAmount}("");
             (bool success2, ) = castCreator.call{value: creatorFeeAmount}("");
             (bool success3, ) = referrer.call{value: referralFee}("");
-            require(success0 && success1 && success2 && success3, "Transfer failed");
+            require(
+                success0 && success1 && success2 && success3,
+                "Transfer failed"
+            );
         } else {
             uint256 feeAmount = (price * feePercent) / 1 ether;
             uint256 creatorFeeAmount = (price * creatorFeePercent) / 1 ether;
@@ -178,6 +189,7 @@ contract Game is Ownable {
         emit Purchased(
             msg.sender,
             castCreator,
+            senderFid,
             castHash,
             referrer,
             amount,
@@ -187,18 +199,23 @@ contract Game is Ownable {
 
     function sell(
         string memory castHash,
-        address castCreator,
-        uint256 amount,
-        uint256 price,
-        address referrer,
+        bytes memory data,
         bytes memory signature
     ) external {
+        (
+            address castCreator,
+            uint256 senderFid,
+            uint256 amount,
+            uint256 price,
+            address referrer
+        ) = abi.decode(data, (address, uint256, uint256, uint256, address));
         if (isPaused || block.number > tradingEndTime) revert GameNotActive();
 
         bytes32 hash = keccak256(
             abi.encodePacked(
                 castHash,
                 castCreator,
+                senderFid,
                 amount,
                 price,
                 referrer,
@@ -220,7 +237,10 @@ contract Game is Ownable {
             (bool success1, ) = channelHost.call{value: feeAmount}("");
             (bool success2, ) = castCreator.call{value: creatorFeeAmount}("");
             (bool success3, ) = referrer.call{value: referralFee}("");
-            require(success0 && success1 && success2 && success3, "Transfer failed");
+            require(
+                success0 && success1 && success2 && success3,
+                "Transfer failed"
+            );
         } else {
             uint256 feeAmount = (price * feePercent) / 1 ether;
             uint256 creatorFeeAmount = (price * creatorFeePercent) / 1 ether;
@@ -232,12 +252,22 @@ contract Game is Ownable {
         }
 
         // Transfer payment
-        (bool success, ) = msg.sender.call{value: (price * .8 ether) / 1 ether}("");
+        (bool success, ) = msg.sender.call{value: (price * .8 ether) / 1 ether}(
+            ""
+        );
         require(success, "Transfer failed");
 
         // Burn ERC1155
         tickets.burn(msg.sender, castHash, amount);
 
-        emit Sold(msg.sender, castCreator, castHash, referrer, amount, price);
+        emit Sold(
+            msg.sender,
+            castCreator,
+            senderFid,
+            castHash,
+            referrer,
+            amount,
+            price
+        );
     }
 }
