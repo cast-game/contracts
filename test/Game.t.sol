@@ -27,17 +27,16 @@ contract GameTest is Test {
     function setUp() public {
         vm.startPrank(owner);
 
-        tickets = new Tickets();
+        // tickets = new Tickets();
 
         game = new Game(
-            "test",
             channelHost,
-            address(tickets),
+            // address(tickets),
             protocolTreasury
         );
         game.startGame(block.number + 1000, block.number + 2000);
 
-        tickets.setMinter(address(game));
+        // tickets.setMinter(address(game));
         vm.deal(alice, 3 ether);
     }
 
@@ -118,8 +117,8 @@ contract GameTest is Test {
         );
         game.buy{value: price}("0x1", data, signature);
 
-        assertEq(tickets.balanceOf(alice, 1), 1);
-        assertEq(tickets.supply(1), 1);
+        assertEq(game.balance(alice, "0x1"), 1);
+        assertEq(game.supply("0x1"), 1);
     }
 
     function test_Sell() public {
@@ -156,8 +155,8 @@ contract GameTest is Test {
         game.sell("0x1", data, signature);
 
         // Check ticket balances
-        assertEq(tickets.balanceOf(alice, 1), 0);
-        assertEq(tickets.supply(1), 0);
+        assertEq(game.balance(alice, "0x1"), 0);
+        assertEq(game.supply("0x1"), 0);
 
         uint256 accumulatedFees = ((price + sellPrice) *
             game.creatorFeePercent()) / 1 ether;
@@ -183,8 +182,8 @@ contract GameTest is Test {
 
         game.buy{value: price}("0x1", data, signature);
 
-        assertEq(tickets.balanceOf(alice, 1), 1);
-        assertEq(tickets.supply(1), 1);
+        assertEq(game.balance(alice, "0x1"), 1);
+        assertEq(game.supply("0x1"), 1);
         assertEq(bob.balance, 0.05 ether);
         assertEq(john.balance, 0.1 ether);
     }

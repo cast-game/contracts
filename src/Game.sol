@@ -4,18 +4,16 @@ pragma solidity ^0.8.25;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import "./Tickets.sol";
+
+// import "./Tickets.sol";
 
 contract Game is Ownable {
     using ECDSA for bytes32;
 
-    Tickets public tickets;
+    // Tickets public tickets;
 
     address public protocolTreasury;
     address public channelHost;
-    string public channelId;
-
-    uint256 constant TICKETS_MAX_SUPPLY = 100;
 
     /// @notice transaction fees
     uint256 public feePercent = 0.05 ether;
@@ -25,6 +23,9 @@ contract Game is Ownable {
     bool public isPaused;
     uint256 public tradingEndTime;
     uint256 public endTime;
+
+    mapping(address => mapping(string => uint256)) public balance;
+    mapping(string => uint256) public supply;
 
     // Nonce to ensure hashes are unique per transaction
     mapping(string => uint256) public nonce;
@@ -58,15 +59,14 @@ contract Game is Ownable {
     error InvalidSignature();
     error MaxSupply();
     error InvalidParams();
+    error InsufficientBalance();
 
     constructor(
-        string memory _channelId,
         address _channelHost,
-        address _ticketsAddress,
+        // address _ticketsAddress,
         address _treasury
     ) Ownable(msg.sender) {
-        tickets = Tickets(_ticketsAddress);
-        channelId = _channelId;
+        // tickets = Tickets(_ticketsAddress);
         channelHost = _channelHost;
         protocolTreasury = _treasury;
     }
@@ -184,7 +184,9 @@ contract Game is Ownable {
         }
 
         // Mint ERC1155
-        tickets.mint(msg.sender, castHash, amount);
+        // tickets.mint(msg.sender, castHash, amount);
+        balance[msg.sender][castHash] += amount;
+        supply[castHash] += amount;
 
         emit Purchased(
             msg.sender,
@@ -210,6 +212,7 @@ contract Game is Ownable {
             address referrer
         ) = abi.decode(data, (address, uint256, uint256, uint256, address));
         if (isPaused || block.number > tradingEndTime) revert GameNotActive();
+        if (balance[msg.sender][castHash] < amount) revert InsufficientBalance();
 
         bytes32 hash = keccak256(
             abi.encodePacked(
@@ -258,7 +261,9 @@ contract Game is Ownable {
         require(success, "Transfer failed");
 
         // Burn ERC1155
-        tickets.burn(msg.sender, castHash, amount);
+        // tickets.burn(msg.sender, castHash, amount);
+        balance[msg.sender][castHash] -= amount;
+        supply[castHash] -= amount;
 
         emit Sold(
             msg.sender,

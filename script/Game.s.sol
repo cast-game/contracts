@@ -9,24 +9,23 @@ contract GameScript is Script {
     function setUp() public {}
 
     function run() public {
-        // test (dev wallet)
-        address channelHost = 0xa85B5383e0E82dBa993747834f91FE03FCCD40ab;
-        address protocolTreasury = 0xa85B5383e0E82dBa993747834f91FE03FCCD40ab;
+        // testnet demo
+        address channelHost = 0xF5745cD4d5BC2E3B7352676544Ea632A9a30FecD;
+        address protocolTreasury = 0xffCCfe5E0B1332A4A83694785f6b8867d6c85DfA;
 
-        // dev wallet
         uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
 
         vm.startBroadcast(deployerPrivateKey);
-        Tickets tickets = new Tickets();
+        // Tickets tickets = new Tickets();
         Game game = new Game(
-            "test",
+            // "test",
             channelHost,
-            address(tickets),
+            // address(tickets),
             protocolTreasury
         );
 
-        tickets.setMinter(address(game));
+        // tickets.setMinter(address(game));
         // remove in prod
-        game.startGame(1748697936, 1748697937);
+        game.startGame(block.number + 999999, block.number + 1000000);
     }
 }
